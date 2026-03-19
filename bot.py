@@ -1,5 +1,6 @@
-from discord.ext import commands
 import discord
+from discord import app_commands
+from discord.ext import commands
 import aiohttp
 import random
 from urllib.parse import quote
@@ -13,37 +14,63 @@ TOKEN = os.getenv("DISCORD_TOKEN")
 LOGS_CHANNELID = 1483592614555942952
 WELCOME_CHANNELID = 1483592839546933268
 
-bot = commands.Bot(command_prefix="!", intents=discord.Intents.all())
+intents = discord.Intents.all()
+bot = commands.Bot(command_prefix="!", intents=intents)
+tree = bot.tree  # Slash command tree
 
+# ──────────────────────────────────────────────
+# BOT HAZIR
+# ──────────────────────────────────────────────
 @bot.event
 async def on_ready():
-    print("Hazır!")
+    await tree.sync()  # Slash komutları Discord'a gönder
+    print(f"Hazır! {bot.user} olarak giriş yapıldı.")
 
+# ──────────────────────────────────────────────
+# LOG: SİLİNEN MESAJ
+# ──────────────────────────────────────────────
 @bot.event
 async def on_message_delete(msg: discord.Message):
     if msg.author == bot.user:
         return
     channel = bot.get_channel(LOGS_CHANNELID)
-    await channel.send(f"Silinen mesaj: {msg.content} Mesajı yazan: {msg.author}")
+    if channel:
+        await channel.send(f"🗑️ **Silinen mesaj:** {msg.content}\n**Yazan:** {msg.author}")
 
+# ──────────────────────────────────────────────
+# LOG: DÜZENLENENs MESAJ
+# ──────────────────────────────────────────────
 @bot.event
 async def on_message_edit(before: discord.Message, after: discord.Message):
     if before.author == bot.user:
         return
     channel = bot.get_channel(LOGS_CHANNELID)
-    await channel.send(f"Düzenlenen mesaj: {before.content} → {after.content}\nYazan: {before.author}")
+    if channel:
+        await channel.send(
+            f"✏️ **Düzenlenen mesaj:**\n"
+            f"**Önce:** {before.content}\n"
+            f"**Sonra:** {after.content}\n"
+            f"**Yazan:** {before.author}"
+        )
 
+# ──────────────────────────────────────────────
+# HOŞGELDİN
+# ──────────────────────────────────────────────
 @bot.event
 async def on_member_join(member: discord.Member):
     channel = bot.get_channel(WELCOME_CHANNELID)
-    embed = discord.Embed(
-        title="Yeni biri katıldı!",
-        description=f"Hoşgeldin, {member.mention}!\nKurallara bakmayı unutma!",
-        color=discord.Color.blurple()
-    )
-    embed.set_author(name="- Merlasy | Master PVP -")
-    await channel.send(member.mention, embed=embed)
+    if channel:
+        embed = discord.Embed(
+            title="Yeni biri katıldı! 🎉",
+            description=f"Hoşgeldin, {member.mention}!\nKurallara bakmayı unutma!",
+            color=discord.Color.blurple()
+        )
+        embed.set_author(name="- Merlasy | Master PVP -")
+        await channel.send(member.mention, embed=embed)
 
+# ──────────────────────────────────────────────
+# KÜFÜR FİLTRESİ
+# ──────────────────────────────────────────────
 kufurler = ["sik", "fuck", "nig", "anan", "amın", "oros"]
 
 @bot.event
@@ -56,40 +83,63 @@ async def on_message(msg: discord.Message):
 
     if any(k in msg.content.lower() for k in kufurler):
         await msg.delete()
-        await msg.author.timeout(datetime.timedelta(minutes=10), reason="küfretme")
+        await msg.author.timeout(datetime.timedelta(minutes=10), reason="Küfür")
         await msg.channel.send(f"{msg.author.mention} küfretme sebebiyle 10 dk timeout yedi.")
 
     await bot.process_commands(msg)
 
-@bot.command()
-async def cmds(ctx):
-    embed = discord.Embed(title="Komutlar", description="!cmds - Standart komutlar", color=discord.Color.blue())
-    embed.add_field(name="!kick", value="@user -> Bir üyeyi atar.")
-    embed.add_field(name="!ban", value="@user -> Bir üyeyi yasaklar.")
-    embed.add_field(name="!help", value="Komutları gösterir")
-    embed.add_field(name="!cmds", value="Komutları ve işlevlerini gösterir")
-    embed.add_field(name="!rng", value="<min> <max> -> En az ve en çok sayı arasında bir sayı seçer")
-    embed.add_field(name="!truthtr", value="Doğru olman gereken bir soru sorar")
-    embed.add_field(name="!translate", value="<tr> <en> -> Türkçe'den İngilizce'ye çeviri")
+# ──────────────────────────────────────────────
+# /cmds
+# ──────────────────────────────────────────────
+@tree.command(name="cmds", description="Tüm komutları ve işlevlerini gösterir.")
+async def cmds(interaction: discord.Interaction):
+    embed = discord.Embed(
+        title="📋 Komutlar",
+        description="Slash komutların listesi:",
+        color=discord.Color.blue()
+    )
+    embed.add_field(name="/kick", value="@kullanıcı → Bir üyeyi atar.", inline=False)
+    embed.add_field(name="/ban", value="@kullanıcı → Bir üyeyi yasaklar.", inline=False)
+    embed.add_field(name="/rng", value="<min> <max> → Rastgele sayı seçer.", inline=False)
+    embed.add_field(name="/truth", value="Sana doğruluk sorusu sorar.", inline=False)
+    embed.add_field(name="/translate", value="<metin> → Türkçe'den İngilizce'ye çevirir.", inline=False)
+    embed.add_field(name="/cmds", value="Bu listeyi gösterir.", inline=False)
     embed.set_author(name="MasterPVP - official.")
-    await ctx.send(embed=embed)
+    await interaction.response.send_message(embed=embed)
 
-@bot.command()
-@commands.has_permissions(kick_members=True)
-async def kick(ctx, member: discord.Member, *, reason=None):
-    if reason is None:
-        reason = "Belirtilmedi"
-    await ctx.guild.kick(member)
-    await ctx.send(f"Kullanıcı {member.name} atıldı. Sebep: {reason}")
+# ──────────────────────────────────────────────
+# /kick
+# ──────────────────────────────────────────────
+@tree.command(name="kick", description="Bir üyeyi sunucudan atar.")
+@app_commands.describe(member="Atılacak kullanıcı", reason="Atılma sebebi")
+@app_commands.checks.has_permissions(kick_members=True)
+async def kick(interaction: discord.Interaction, member: discord.Member, reason: str = "Belirtilmedi"):
+    await interaction.guild.kick(member, reason=reason)
+    await interaction.response.send_message(f"✅ **{member.name}** atıldı. Sebep: {reason}")
 
-@bot.command()
-@commands.has_permissions(ban_members=True)
-async def ban(ctx, member: discord.Member, *, reason=None):
-    if reason is None:
-        reason = "Belirtilmedi"
-    await ctx.guild.ban(member)
-    await ctx.send(f"Kullanıcı {member.name} yasaklandı. Sebep: {reason}")
+@kick.error
+async def kick_error(interaction: discord.Interaction, error: app_commands.AppCommandError):
+    if isinstance(error, app_commands.MissingPermissions):
+        await interaction.response.send_message("❌ Bu komutu kullanmak için **Üye At** iznine ihtiyacın var.", ephemeral=True)
 
+# ──────────────────────────────────────────────
+# /ban
+# ──────────────────────────────────────────────
+@tree.command(name="ban", description="Bir üyeyi sunucudan yasaklar.")
+@app_commands.describe(member="Yasaklanacak kullanıcı", reason="Yasaklanma sebebi")
+@app_commands.checks.has_permissions(ban_members=True)
+async def ban(interaction: discord.Interaction, member: discord.Member, reason: str = "Belirtilmedi"):
+    await interaction.guild.ban(member, reason=reason)
+    await interaction.response.send_message(f"🔨 **{member.name}** yasaklandı. Sebep: {reason}")
+
+@ban.error
+async def ban_error(interaction: discord.Interaction, error: app_commands.AppCommandError):
+    if isinstance(error, app_commands.MissingPermissions):
+        await interaction.response.send_message("❌ Bu komutu kullanmak için **Üye Yasakla** iznine ihtiyacın var.", ephemeral=True)
+
+# ──────────────────────────────────────────────
+# /truth
+# ──────────────────────────────────────────────
 sorular = [
     "En sevdiğin kişi kim?",
     "Hiç sevgilin oldu mu?",
@@ -100,23 +150,36 @@ sorular = [
     "En utanç verici anın neydi?",
 ]
 
-@bot.command()
-async def truth(ctx):
-    ch = random.choice(sorular)
-    embed = discord.Embed(title="🎲 Rastgele Soru", description=ch, colour=discord.Color.blurple())
-    embed.set_footer(text=f"İsteyen: {ctx.author.name}")
-    await ctx.send(embed=embed)
+@tree.command(name="truth", description="Sana rastgele bir doğruluk sorusu sorar.")
+async def truth(interaction: discord.Interaction):
+    soru = random.choice(sorular)
+    embed = discord.Embed(
+        title="🎲 Rastgele Soru",
+        description=soru,
+        colour=discord.Color.blurple()
+    )
+    embed.set_footer(text=f"İsteyen: {interaction.user.name}")
+    await interaction.response.send_message(embed=embed)
 
-@bot.command()
-async def rng(ctx, min: int = 1, max: int = 100):
+# ──────────────────────────────────────────────
+# /rng
+# ──────────────────────────────────────────────
+@tree.command(name="rng", description="Belirtilen aralıkta rastgele bir sayı seçer.")
+@app_commands.describe(min="En küçük sayı (varsayılan: 1)", max="En büyük sayı (varsayılan: 100)")
+async def rng(interaction: discord.Interaction, min: int = 1, max: int = 100):
     if min >= max:
-        await ctx.send("Az sayı çok sayıdan fazla olamaz!")
+        await interaction.response.send_message("❌ Az sayı çok sayıdan fazla olamaz!", ephemeral=True)
         return
     result = random.randint(min, max)
-    await ctx.send(f"Sonuç: {result}")
+    await interaction.response.send_message(f"🎰 **Sonuç:** {result}")
 
-@bot.command()
-async def translate(ctx, *, text: str):
+# ──────────────────────────────────────────────
+# /translate
+# ──────────────────────────────────────────────
+@tree.command(name="translate", description="Türkçe metni İngilizce'ye çevirir.")
+@app_commands.describe(text="Çevrilecek Türkçe metin")
+async def translate(interaction: discord.Interaction, text: str):
+    await interaction.response.defer()  # API çağrısı uzun sürebilir
     try:
         async with aiohttp.ClientSession() as session:
             url = f"https://translate.googleapis.com/translate_a/single?client=gtx&sl=tr&tl=en&dt=t&q={quote(text)}"
@@ -126,9 +189,12 @@ async def translate(ctx, *, text: str):
                 embed = discord.Embed(title="🌍 Çeviri", color=discord.Color.green())
                 embed.add_field(name="🇹🇷 Türkçe", value=text, inline=False)
                 embed.add_field(name="🇬🇧 İngilizce", value=result, inline=False)
-                embed.set_footer(text=f"İsteyen: {ctx.author.name}")
-                await ctx.send(embed=embed)
+                embed.set_footer(text=f"İsteyen: {interaction.user.name}")
+                await interaction.followup.send(embed=embed)
     except Exception as e:
-        await ctx.send(f"❌ Hata: {e}")
+        await interaction.followup.send(f"❌ Hata: {e}")
 
+# ──────────────────────────────────────────────
+# ÇALIŞTIR
+# ──────────────────────────────────────────────
 bot.run(TOKEN)
