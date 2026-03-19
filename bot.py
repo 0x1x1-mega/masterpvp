@@ -100,6 +100,8 @@ async def cmds(interaction: discord.Interaction):
     )
     embed.add_field(name="/kick", value="@kullanıcı → Bir üyeyi atar.", inline=False)
     embed.add_field(name="/ban", value="@kullanıcı → Bir üyeyi yasaklar.", inline=False)
+    embed.add_field(name="/timeout", value="@kullanıcı <dakika> → Bir üyeye timeout verir.", inline=False)
+    embed.add_field(name="/untimeout", value="@kullanıcı → Bir üyenin timeoutunu kaldırır.", inline=False)
     embed.add_field(name="/rng", value="<min> <max> → Rastgele sayı seçer.", inline=False)
     embed.add_field(name="/truth", value="Sana doğruluk sorusu sorar.", inline=False)
     embed.add_field(name="/translate", value="<metin> → Türkçe'den İngilizce'ye çevirir.", inline=False)
@@ -136,6 +138,57 @@ async def ban(interaction: discord.Interaction, member: discord.Member, reason: 
 async def ban_error(interaction: discord.Interaction, error: app_commands.AppCommandError):
     if isinstance(error, app_commands.MissingPermissions):
         await interaction.response.send_message("❌ Bu komutu kullanmak için **Üye Yasakla** iznine ihtiyacın var.", ephemeral=True)
+
+# ──────────────────────────────────────────────
+# /timeout
+# ──────────────────────────────────────────────
+@tree.command(name="timeout", description="Bir üyeye timeout verir.")
+@app_commands.describe(
+    member="Timeout verilecek kullanıcı",
+    sure="Timeout süresi (dakika cinsinden)",
+    reason="Timeout sebebi"
+)
+@app_commands.checks.has_permissions(moderate_members=True)
+async def timeout(interaction: discord.Interaction, member: discord.Member, sure: int = 10, reason: str = "Belirtilmedi"):
+    if member.top_role >= interaction.user.top_role:
+        await interaction.response.send_message("❌ Kendinle aynı veya daha yüksek roldeki birine timeout veremezsin!", ephemeral=True)
+        return
+    await member.timeout(datetime.timedelta(minutes=sure), reason=reason)
+    embed = discord.Embed(
+        title="⏳ Timeout Verildi",
+        color=discord.Color.orange()
+    )
+    embed.add_field(name="Kullanıcı", value=member.mention, inline=True)
+    embed.add_field(name="Süre", value=f"{sure} dakika", inline=True)
+    embed.add_field(name="Sebep", value=reason, inline=False)
+    embed.add_field(name="Veren", value=interaction.user.mention, inline=True)
+    await interaction.response.send_message(embed=embed)
+
+@timeout.error
+async def timeout_error(interaction: discord.Interaction, error: app_commands.AppCommandError):
+    if isinstance(error, app_commands.MissingPermissions):
+        await interaction.response.send_message("❌ Bu komutu kullanmak için **Üyeleri Sustur** iznine ihtiyacın var.", ephemeral=True)
+
+# ──────────────────────────────────────────────
+# /untimeout
+# ──────────────────────────────────────────────
+@tree.command(name="untimeout", description="Bir üyenin timeoutunu kaldırır.")
+@app_commands.describe(member="Timeoutu kaldırılacak kullanıcı")
+@app_commands.checks.has_permissions(moderate_members=True)
+async def untimeout(interaction: discord.Interaction, member: discord.Member):
+    await member.timeout(None)
+    embed = discord.Embed(
+        title="✅ Timeout Kaldırıldı",
+        description=f"{member.mention} kullanıcısının timeoutu kaldırıldı.",
+        color=discord.Color.green()
+    )
+    embed.add_field(name="Kaldıran", value=interaction.user.mention, inline=True)
+    await interaction.response.send_message(embed=embed)
+
+@untimeout.error
+async def untimeout_error(interaction: discord.Interaction, error: app_commands.AppCommandError):
+    if isinstance(error, app_commands.MissingPermissions):
+        await interaction.response.send_message("❌ Bu komutu kullanmak için **Üyeleri Sustur** iznine ihtiyacın var.", ephemeral=True)
 
 # ──────────────────────────────────────────────
 # /truth
