@@ -106,6 +106,7 @@ async def cmds(interaction: discord.Interaction):
     embed.add_field(name="/truth", value="Sana doğruluk sorusu sorar.", inline=False)
     embed.add_field(name="/translate", value="<metin> → Türkçe'den İngilizce'ye çevirir.", inline=False)
     embed.add_field(name="/cmds", value="Bu listeyi gösterir.", inline=False)
+    embed.add_field(name="/hesapla", value="<sayı1> <işlem> <sayı2> → Matematik işlemi yapar.", inline=False)
     embed.set_author(name="MasterPVP - official.")
     await interaction.response.send_message(embed=embed)
 
@@ -246,6 +247,81 @@ async def translate(interaction: discord.Interaction, text: str):
                 await interaction.followup.send(embed=embed)
     except Exception as e:
         await interaction.followup.send(f"❌ Hata: {e}")
+
+# ──────────────────────────────────────────────
+# /hesapla
+# ──────────────────────────────────────────────
+@tree.command(name="hesapla", description="İki sayı ile matematik işlemi yapar.")
+@app_commands.describe(
+    sayi1="Birinci sayı",
+    islem="Yapılacak işlem",
+    sayi2="İkinci sayı"
+)
+@app_commands.choices(islem=[
+    app_commands.Choice(name="➕ Toplama",    value="toplama"),
+    app_commands.Choice(name="➖ Çıkarma",   value="cikarma"),
+    app_commands.Choice(name="✖️ Çarpma",    value="carpma"),
+    app_commands.Choice(name="➗ Bölme",     value="bolme"),
+    app_commands.Choice(name="🔢 Üs Alma",   value="us"),
+])
+async def hesapla(
+    interaction: discord.Interaction,
+    sayi1: float,
+    islem: app_commands.Choice[str],
+    sayi2: float
+):
+    semboller = {
+        "toplama": "+",
+        "cikarma": "−",
+        "carpma":  "×",
+        "bolme":   "÷",
+        "us":      "^",
+    }
+
+    if islem.value == "toplama":
+        sonuc = sayi1 + sayi2
+    elif islem.value == "cikarma":
+        sonuc = sayi1 - sayi2
+    elif islem.value == "carpma":
+        sonuc = sayi1 * sayi2
+    elif islem.value == "bolme":
+        if sayi2 == 0:
+            await interaction.response.send_message(
+                "❌ Sıfıra bölme yapılamaz!", ephemeral=True
+            )
+            return
+        sonuc = sayi1 / sayi2
+    elif islem.value == "us":
+        if sayi1 == 0 and sayi2 < 0:
+            await interaction.response.send_message(
+                "❌ 0'ın negatif üssü hesaplanamaz!", ephemeral=True
+            )
+            return
+        sonuc = sayi1 ** sayi2
+
+    # Tam sayıysa .0 gösterme
+    sayi1_str = int(sayi1) if sayi1 == int(sayi1) else sayi1
+    sayi2_str = int(sayi2) if sayi2 == int(sayi2) else sayi2
+    sonuc_str = int(sonuc) if isinstance(sonuc, float) and sonuc == int(sonuc) else sonuc
+
+    sembol = semboller[islem.value]
+
+    embed = discord.Embed(
+        title="🧮 Hesap Makinesi",
+        color=discord.Color.blurple()
+    )
+    embed.add_field(
+        name="İşlem",
+        value=f"`{sayi1_str} {sembol} {sayi2_str}`",
+        inline=False
+    )
+    embed.add_field(
+        name="Sonuç",
+        value=f"**`{sonuc_str}`**",
+        inline=False
+    )
+    embed.set_footer(text=f"İsteyen: {interaction.user.name}")
+    await interaction.response.send_message(embed=embed)
 
 # ──────────────────────────────────────────────
 # ÇALIŞTIR
