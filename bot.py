@@ -323,6 +323,12 @@ async def hesapla(
     embed.set_footer(text=f"İsteyen: {interaction.user.name}")
     await interaction.response.send_message(embed=embed)
 
+# Basic discord.py
+@tree.command(name="print", description="İstediğin bişeyi yazdırır!")
+@app_commands.describe(text="Enter your text")
+async def print(interaction:discord.Interaction, text: str):
+    await interaction.response.send_message(text)
+
 # ──────────────────────────────────────────────
 # ÇALIŞTIR
 # ──────────────────────────────────────────────
